@@ -4,20 +4,20 @@ import org.keycloak.component.ComponentModel;
 import org.keycloak.credential.CredentialInput;
 import org.keycloak.credential.CredentialInputValidator;
 import org.keycloak.credential.UserCredentialStore;
-import org.keycloak.models.KeycloakSession;
-import org.keycloak.models.RealmModel;
-import org.keycloak.models.UserCredentialModel;
-import org.keycloak.models.UserModel;
+import org.keycloak.models.*;
 import org.keycloak.models.credential.PasswordCredentialModel;
 import org.keycloak.storage.UserStorageProvider;
 import org.keycloak.storage.adapter.AbstractUserAdapter;
 import org.keycloak.storage.user.UserLookupProvider;
+
+import java.util.Set;
 
 public class RemoteUserStorageProvider implements UserStorageProvider,
         UserLookupProvider, CredentialInputValidator{
     private final KeycloakSession session;
     private final ComponentModel model;
     private final UsersApiService usersService;
+    private String username;
 
     public RemoteUserStorageProvider(KeycloakSession session,
                                      ComponentModel model, UsersApiService usersService) {
@@ -49,15 +49,27 @@ public class RemoteUserStorageProvider implements UserStorageProvider,
         if(user!=null) {
             returnValue = createUserModel(username, realm);
         }
-
+        System.out.println("getUserByUsername: returnValue: " + returnValue.getUsername());
         return returnValue;
     }
 
     private UserModel createUserModel(String username, RealmModel realm) {
+        this.username = username;
         return new AbstractUserAdapter(session, realm, model) {
             @Override
             public String getUsername() {
+                System.out.println("createUserModel: username: " + username);
                 return username;
+            }
+
+            @Override
+            public boolean isEmailVerified() {
+                return true;
+            }
+
+            @Override
+            public Set<RoleModel> getRealmRoleMappings() {
+                return super.getRealmRoleMappings();
             }
         };
     }
@@ -101,7 +113,10 @@ public class RemoteUserStorageProvider implements UserStorageProvider,
     public boolean isValid(RealmModel realm, UserModel user, CredentialInput input) {
         if (!supportsCredentialType(input.getType()) || !(input instanceof UserCredentialModel)) return false;
 
-        VerifyPasswordResponse verifyPasswordResponse = usersService.verifyUserPassword(user.getUsername(),
+        System.out.println("isValid method: user: " + user.toString());
+        System.out.println("isValid method: getUsername: " + user.getUsername());
+        System.out.println("isValid method: password: " + input.getChallengeResponse());
+        VerifyPasswordResponse verifyPasswordResponse = usersService.verifyUserPassword(this.username,
                 input.getChallengeResponse());
 
         if(verifyPasswordResponse == null) return false;
